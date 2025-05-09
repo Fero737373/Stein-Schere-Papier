@@ -1,61 +1,52 @@
 import pygame
-from config import HP_MAX, INPUT_KEYS
-from ui import UI
+from enum import Enum, auto
+from screens.homescreen import HomeScreen
+from screens.menu import MenuScreen
+from screens.settings import SettingsScreen
+from screens.player_v_bot import PlayerVBotScreen
+from screens.battle import BattleScreen
+from screens.end import EndScreen
+from screens.highscore import HighscoreScreen
+from config import SETTINGS
 
-class Game:
-    def __init__(self, screen):
+class ScreenNames(Enum):
+    HOME = auto()
+    MENU = auto()
+    SETTINGS = auto()
+    PLAYER_V_BOT = auto()
+    BATTLE = auto()
+    END = auto()
+    HIGHSCORE = auto()
+
+class GameApp:
+    def __init__(self, screen: pygame.Surface):
         self.screen = screen
-        self.hp1 = HP_MAX
-        self.hp2 = HP_MAX
-        self.choice1 = None
-        self.choice2 = None
+        self.screens = {
+            ScreenNames.HOME: HomeScreen(self),
+            ScreenNames.MENU: MenuScreen(self),
+            ScreenNames.SETTINGS: SettingsScreen(self),
+            ScreenNames.PLAYER_V_BOT: PlayerVBotScreen(self),
+            ScreenNames.BATTLE: BattleScreen(self),
+            ScreenNames.END: EndScreen(self),
+            ScreenNames.HIGHSCORE: HighscoreScreen(self),
+        }
+        self.current = ScreenNames.HOME
 
-    def handle_input(self, event):
-        if event.type == pygame.KEYDOWN:
-            for player, keys in INPUT_KEYS.items():
-                for choice, key in keys.items():
-                    if event.key == key:
-                        if player == 'player1':
-                            self.choice1 = choice
-                        else:
-                            self.choice2 = choice
-                        self.resolve_round()
+    def change_screen(self, new_screen: ScreenNames):
+        self.current = new_screen
+        self.screens[self.current].on_enter()
 
-    def resolve_round(self):
-        if self.choice1 and self.choice2:
-            result = Game.evaluate(self.choice1, self.choice2)
-            if result == 1:
-                self.hp2 -= 1
-            elif result == 2:
-                self.hp1 -= 1
-            # Für die nächste Runde zurücksetzen
-            self.choice1 = None
-            self.choice2 = None
+    def run(self, clock):
+        running = True
+        while running:
+            dt = clock.tick(SETTINGS['FPS']) / 1000.0
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                else:
+                    self.screens[self.current].handle_event(event)
 
-    @staticmethod
-    def evaluate(c1, c2):
-        wins = {'rock': 'scissors', 'scissors': 'paper', 'paper': 'rock'}
-        if c1 == c2:
-            return 0
-        return 1 if wins[c1] == c2 else 2
+            self.screens[self.current].update(dt)
+            self.screens[self.current].draw()
+            pygame.display.flip()
 
-    def update(self):
-        self.screen.fill((30, 30, 30))
-        UI.draw_hp(self.screen, self.hp1, self.hp2)
-
-        # Spielende prüfen
-        if self.hp1 <= 0 or self.hp2 <= 0:
-            self.game_over()
-
-    def game_over(self):
-        font = pygame.font.Font(None, 74)
-        if self.hp1 <= 0:
-            text = font.render("Player 2 gewinnt!", True, (255, 255, 255))
-        else:
-            text = font.render("Player 1 gewinnt!", True, (255, 255, 255))
-        rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-        self.screen.blit(text, rect)
-        pygame.display.flip()
-        pygame.time.wait(3000)
-        pygame.quit()
-        exit()

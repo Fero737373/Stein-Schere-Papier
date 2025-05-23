@@ -8,15 +8,7 @@ from screens.battle import BattleScreen
 from screens.end import EndScreen
 from screens.highscore import HighscoreScreen
 from config import SETTINGS
-
-class ScreenNames(Enum):
-    HOME = auto()
-    MENU = auto()
-    SETTINGS = auto()
-    PLAYER_V_BOT = auto()
-    BATTLE = auto()
-    END = auto()
-    HIGHSCORE = auto()
+from screen_names import ScreenNames
 
 class GameApp:
     def __init__(self, screen: pygame.Surface):

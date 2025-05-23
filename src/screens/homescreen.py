@@ -1,18 +1,17 @@
 import pygame, os, math
-from game import ScreenNames
+from screen_names import ScreenNames
 
 class HomeScreen:
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, screen):
+        self.screen = screen
         # Pfad zum assets-Ordner (zwei Ebenen über diesem File)
         base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assets'))
         # Assets laden
-        self.bg      = pygame.image.load(os.path.join(base, 'bg.png')).convert()
-        self.logo    = pygame.image.load(os.path.join(base, 'logo.png')).convert_alpha()
-        self.btn     = pygame.image.load(os.path.join(base, 'btn_start.png')).convert_alpha()
-        self.btn_hov = pygame.image.load(os.path.join(base, 'btn_start_hover.png')).convert_alpha()
-        self.btn_lang = pygame.image.load(os.path.join(base, 'btn_de.png')).convert_alpha()
-        self.btn_lang_hov = pygame.image.load(os.path.join(base, 'btn_de_hover.png')).convert_alpha()
+        self.bg      = pygame.image.load(os.path.join(base, 'background_2.png')).convert()
+        self.bg_width = self.bg.get_width()
+        self.logo    = pygame.image.load(os.path.join(base, 'SSP_Hand.png')).convert_alpha()
+        self.btn     = pygame.image.load(os.path.join(base, 'start_button.png')).convert_alpha()
+        self.btn_hov = pygame.image.load(os.path.join(base, 'start_hover.png')).convert_alpha()
 
         # Hintergrund-Tiling
         self.bg_width = self.bg.get_width()
@@ -22,7 +21,7 @@ class HomeScreen:
         # Button-Rechtecke
         w,h = 200,60
         self.start_rect = pygame.Rect(0,0, w,h)
-        self.start_rect.center = (self.app.screen.get_width()//2, 350)
+        self.start_rect.center = (self.screen.get_width() // 2, 350)
         lw, lh = 64,32
         self.lang_rect = pygame.Rect(20,20, lw,lh)
 
@@ -30,6 +29,8 @@ class HomeScreen:
         self.float_time = 0.0
         self.float_range = 15  # Pixel
         self.float_speed = 2.0  # Zyklen pro Sekunde
+
+        self.logo_offset = 0    # <<< --- Das ist der wichtige Fix!
 
     def on_enter(self):
         # Reset Scroll-Offset und Timer
@@ -39,9 +40,11 @@ class HomeScreen:
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.start_rect.collidepoint(event.pos):
-                self.app.change_screen(ScreenNames.MENU)
+                # Hier brauchst du Zugriff auf die App, falls du den Screen wechseln willst
+                # Das musst du ggf. anders lösen, z.B. über einen Callback
+                pass
             elif self.lang_rect.collidepoint(event.pos):
-                self.app.change_screen(ScreenNames.SETTINGS)
+                pass
 
     def update(self, dt):
         # Background scroll
@@ -54,11 +57,9 @@ class HomeScreen:
         self.logo_offset = math.sin(self.float_time) * self.float_range
 
     def draw(self):
-        s = self.app.screen
-        # BG zweimal nebeneinander
-        x = int(self.bg_x)
-        s.blit(self.bg, (x, 0))
-        s.blit(self.bg, (x + self.bg_width, 0))
+        s = self.screen
+        # Hintergrund exakt einmal zeichnen, ohne Tiling und ohne Skalierung
+        s.blit(self.bg, (0, 0))
 
         # Logo mit Schweben
         logo_r = self.logo.get_rect(center=(s.get_width()//2, 200 + self.logo_offset))
@@ -72,10 +73,3 @@ class HomeScreen:
             img = self.btn
         btn_r = img.get_rect(center=self.start_rect.center)
         s.blit(img, btn_r)
-
-        # Sprach-Button (Hover-Effekt)
-        if self.lang_rect.collidepoint(mpos):
-            lang_img = self.btn_lang_hov
-        else:
-            lang_img = self.btn_lang
-        s.blit(lang_img, self.lang_rect)

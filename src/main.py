@@ -1,6 +1,9 @@
 import pygame
 from enum import Enum, auto
+from screen_names import ScreenNames
+from game import GameApp
 from screens.homescreen import HomeScreen
+from screens.menu import MenuScreen
 
 # Spielzustände definieren
 class GameState(Enum):
@@ -21,8 +24,9 @@ class Game:
         self.state = GameState.START
         self.running = True
 
-        # Nur noch HomeScreen initialisieren
-        self.homescreen = HomeScreen(self.screen)
+        # Starte mit dem HomeScreen und übergebe 'self' als Manager
+        self.current_screen = HomeScreen(self.screen, self)
+        self.current_screen.on_enter()
 
         # Platzhalter für Einstellungen
         self.language = 'DE'
@@ -32,13 +36,29 @@ class Game:
         }
         self.difficulty = 'Anfänger'
 
+    def change_screen(self, screen_name):
+        if screen_name == ScreenNames.MENU:
+            self.current_screen = MenuScreen(self)
+            self.current_screen.on_enter()
+        elif screen_name == ScreenNames.HOME:
+            from screens.homescreen import HomeScreen  # falls nötig
+            self.current_screen = HomeScreen(self.screen, self)
+            self.current_screen.on_enter()
+        # Hier können ggf. weitere Screens ergänzt werden
+
     def run(self):
-        while self.running:
-            self.handle_events()
-            self.update()
-            self.draw()
+        clock = pygame.time.Clock()
+        running = True
+        while running:
+            dt = clock.tick(60) / 1000.0
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                else:
+                    self.current_screen.handle_event(event)
+            self.current_screen.update(dt)
+            self.current_screen.draw()
             pygame.display.flip()
-            self.clock.tick(60)
         pygame.quit()
 
     def handle_events(self):
@@ -83,7 +103,7 @@ class Game:
         pass
 
     def draw_start(self):
-        self.homescreen.draw()  # Nur noch diese Zeile!
+        self.current_screen.draw()  # Nur noch diese Zeile!
 
     def update_menu(self):
         pass
@@ -116,4 +136,12 @@ class Game:
         self.screen.fill((100, 0, 0))
 
 if __name__ == '__main__':
-    Game().run()
+    app = GameApp()
+    app.run()
+
+# Template for all screen classes
+def __init__(self, screen, game):
+    self.screen = screen
+    self.game = game
+    self.width = self.screen.get_width()
+    self.height = self.screen.get_height()

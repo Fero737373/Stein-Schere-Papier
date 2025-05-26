@@ -1,8 +1,8 @@
 import pygame
 from screen_names import ScreenNames
 
-class SettingsScreen:
-    def __init__(self, app):  # Changed to take single app parameter
+class PlayerVsBotScreen:
+    def __init__(self, app):
         self.game = app
         self.screen = app.screen
         self.width = self.screen.get_width()
@@ -14,7 +14,7 @@ class SettingsScreen:
         self.font = pygame.font.Font(None, 36)
         
     def on_enter(self):
-        print("Entered Settings Screen")
+        print("Entered Player vs Bot Screen")
         
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -25,6 +25,6 @@ class SettingsScreen:
         
     def draw(self):
         self.screen.fill(self.BG_COLOR)
-        text = self.font.render("Settings", True, self.TEXT_COLOR)
+        text = self.font.render("Player vs Bot", True, self.TEXT_COLOR)
         text_rect = text.get_rect(center=(self.width//2, self.height//2))
         self.screen.blit(text, text_rect)

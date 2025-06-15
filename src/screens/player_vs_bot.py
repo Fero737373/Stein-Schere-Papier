@@ -2,9 +2,9 @@ import pygame
 from screen_names import ScreenNames
 
 class PlayerVsBotScreen:
-    def __init__(self, screen, game):
-        self.screen = screen
-        self.game = game
+    def __init__(self, app):
+        self.game = app
+        self.screen = app.screen
         self.width = self.screen.get_width()
         self.height = self.screen.get_height()
         

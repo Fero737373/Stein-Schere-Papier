@@ -11,20 +11,26 @@ class HomeScreen:
         self.manager = manager
         pygame.display.set_caption("Stein Schere Papier")  # Setzt den Fenster-Titel
 
-        # Korrigierter Pfad zum assets-Ordner
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Alternativer Pfad-Mechanismus
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base = os.path.join(current_dir, "..")
+        assets_dir = os.path.join(base, "assets")
+        
+        print(f"Suche Assets in: {assets_dir}")  # Debug-Ausgabe
 
-        # Assets laden
         try:
-            self.bg      = pygame.image.load(os.path.join(base, 'assets', 'background_2.png')).convert()
+            # Assets laden
+            self.bg      = pygame.image.load(os.path.join(assets_dir, 'background_2.png')).convert()
+            print("Background geladen")  # Debug-Ausgabe
             self.bg      = pygame.transform.scale(self.bg, (screen.get_width(), screen.get_height()))
             self.bg_width= self.bg.get_width()
-            self.logo    = pygame.image.load(os.path.join(base, 'assets', 'SSP_Logo.png')).convert_alpha()
-            self.btn     = pygame.image.load(os.path.join(base, 'assets', 'start_button.png')).convert_alpha()
-            self.btn_hov = pygame.image.load(os.path.join(base, 'assets', 'start_hover.png')).convert_alpha()
-        except pygame.error as e:
-            print(f"Fehler beim Laden der Assets: {e}")
-            print(f"Versuchter Pfad: {base}/assets/")
+            self.logo    = pygame.image.load(os.path.join(assets_dir, 'SSP_Logo.png')).convert_alpha()
+            self.btn     = pygame.image.load(os.path.join(assets_dir, 'start_button.png')).convert_alpha()
+            self.btn_hov = pygame.image.load(os.path.join(assets_dir, 'start_hover.png')).convert_alpha()
+        except Exception as e:
+            print(f"Fehler beim Laden: {str(e)}")
+            print(f"Aktuelles Verzeichnis: {os.getcwd()}")
+            print(f"Dateiliste: {os.listdir(assets_dir)}")
             raise SystemExit()
 
         # Hintergrund-Tiling
@@ -84,3 +90,5 @@ class HomeScreen:
 
         # Sprach-Button (nur als Platzhalter)
         pygame.draw.rect(s, (255, 255, 255, 50), self.lang_rect, border_radius=5)
+
+        pygame.display.flip()  # Wichtig: Screen aktualisieren

@@ -29,4 +29,5 @@ class ScreenManager:
                     self.current_screen.handle_event(event)
             self.current_screen.update(dt)
             self.current_screen.draw()
+            pygame.display.flip()  # Wichtig: Screen aktualisieren
         pygame.quit()

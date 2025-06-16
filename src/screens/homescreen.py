@@ -1,5 +1,3 @@
-# screens/homescreen.py
-
 import pygame
 import os
 import math
@@ -27,6 +25,11 @@ class HomeScreen:
             self.logo    = pygame.image.load(os.path.join(assets_dir, 'SSP_Logo.png')).convert_alpha()
             self.btn     = pygame.image.load(os.path.join(assets_dir, 'start_button.png')).convert_alpha()
             self.btn_hov = pygame.image.load(os.path.join(assets_dir, 'start_hover.png')).convert_alpha()
+
+            # Hintergrundmusik laden und abspielen
+            pygame.mixer.music.load(os.path.join(assets_dir, 'background_music_homescreen.mp3'))
+            pygame.mixer.music.set_volume(0.5)
+            pygame.mixer.music.play(-1)  # Endlosschleife
         except Exception as e:
             print(f"Fehler beim Laden: {str(e)}")
             print(f"Aktuelles Verzeichnis: {os.getcwd()}")
@@ -41,8 +44,6 @@ class HomeScreen:
         w, h = 200, 60
         self.start_rect = pygame.Rect(0, 0, w, h)
         self.start_rect.center = (self.screen.get_width() // 2, 350)
-        lw, lh = 64, 32
-        self.lang_rect = pygame.Rect(20, 20, lw, lh)
 
         # Logo-Schwebe-Parameter
         self.float_time = 0.0
@@ -60,8 +61,6 @@ class HomeScreen:
             if self.start_rect.collidepoint(event.pos):
                 # Wechsel zum Player-vs-Player Screen
                 self.manager.change_screen(ScreenNames.PVP)
-            elif self.lang_rect.collidepoint(event.pos):
-                print("Sprache ändern – hier Callback einbauen")
 
     def update(self, dt):
         # Background scroll
@@ -87,8 +86,5 @@ class HomeScreen:
         img = self.btn_hov if self.start_rect.collidepoint(mpos) else self.btn
         btn_r = img.get_rect(center=self.start_rect.center)
         s.blit(img, btn_r)
-
-        # Sprach-Button (nur als Platzhalter)
-        pygame.draw.rect(s, (255, 255, 255, 50), self.lang_rect, border_radius=5)
 
         pygame.display.flip()  # Wichtig: Screen aktualisieren

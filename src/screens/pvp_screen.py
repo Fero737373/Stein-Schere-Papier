@@ -98,7 +98,7 @@ class PlayerVPlayerScreen:
 
         self.images = {}
         files = {
-            'background':    'background.png',
+            'background':    'SSP_battlebackground.png',
             'heart_full':    'heart_full.png',
             'heart_empty':   'heart_empty.png',
             'countdown_1':   'countdown_1.png',

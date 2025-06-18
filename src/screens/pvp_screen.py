@@ -209,7 +209,7 @@ class PlayerVPlayerScreen:
                     pygame.mixer.music.stop()
                 except:
                     pass
-                self.manager.switch_screen(ScreenNames.MAIN_MENU)
+                self.manager.change_screen(ScreenNames.HOME)
             elif self.game_state == "input_phase":
                 # Player 1 Controls (A,S,D)
                 if event.key == pygame.K_a:
@@ -463,8 +463,8 @@ class PlayerVPlayerScreen:
     def draw_buttons(self):
         """Draw control buttons at bottom"""
         button_width = 90
-        button_height = 70
-        button_y = SCREEN_HEIGHT - 90
+        button_height = 90
+        button_y = SCREEN_HEIGHT - 70
         
         # Player 1 buttons
         p1_buttons = [(120, "A\nRock"), (220, "S\nScissors"), (320, "D\nPaper")]

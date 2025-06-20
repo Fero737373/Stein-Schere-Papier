@@ -73,32 +73,27 @@ class PlayerVPlayerScreen:
     def load_images(self):
         """Load all game images with proper error handling"""
         # Bessere Pfad-Behandlung
-        try:
-            # Versuche verschiedene mögliche Pfade
-            possible_paths = [
-                os.path.join(os.path.dirname(__file__), '..', 'assets'),
-                os.path.join(os.path.dirname(__file__), '..', '..', 'assets'),
-                'assets',
-                'src/assets'
-            ]
-            
-            base_path = None
-            for path in possible_paths:
-                if os.path.exists(path):
-                    base_path = os.path.abspath(path)
-                    break
-            
-            if base_path is None:
-                print("Warning: Assets folder not found, using fallback graphics")
-                base_path = ""
-                
-        except Exception as e:
-            print(f"Error finding assets path: {e}")
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), '..', 'assets'),
+            os.path.join(os.path.dirname(__file__), '..', '..', 'assets'),
+            'assets',
+            'src/assets'
+        ]
+        
+        base_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                base_path = os.path.abspath(path)
+                print(f"Assets-Ordner gefunden: {base_path}")
+                break
+        
+        if base_path is None:
+            print("Warning: Assets folder not found in:", possible_paths)
             base_path = ""
 
         self.images = {}
         files = {
-            'background':    'SSP_battlebackground.png',
+            'background': 'background_2.png',   # Hintergrundbild
             'heart_full':    'heart_full.png',
             'heart_empty':   'heart_empty.png',
             'countdown_1':   'countdown_1.png',
@@ -120,48 +115,49 @@ class PlayerVPlayerScreen:
         
         for key, fname in files.items():
             try:
-                if base_path:
-                    path = os.path.join(base_path, fname)
-                    if fname.endswith('.gif'):
-                        # GIF Fallback - erstelle animierten Platzhalter
-                        surf = pygame.Surface((200, 200))
-                        surf.fill(GRAY)
-                        # Füge Text hinzu
-                        text = self.font.render(key.replace('_', ' ').title(), True, BLACK)
-                        text_rect = text.get_rect(center=surf.get_rect().center)
-                        surf.blit(text, text_rect)
-                        self.images[key] = surf
-                    else:
-                        img = pygame.image.load(path)
-                        self.images[key] = img.convert_alpha() if img.get_alpha() else img.convert()
-                else:
+                if not base_path:
                     raise FileNotFoundError("No assets path found")
-                    
-            except (pygame.error, FileNotFoundError, OSError) as e:
-                # Erstelle Fallback-Bild
-                if 'heart' in key:
-                    surf = pygame.Surface((40, 40))
-                    color = RED if 'full' in key else GRAY
-                    surf.fill(color)
-                elif 'hand' in key:
-                    surf = pygame.Surface((150, 150))
-                    surf.fill(GRAY)
-                elif 'countdown' in key:
-                    surf = pygame.Surface((100, 100))
-                    surf.fill(WHITE)
-                elif 'wins' in key:
-                    surf = pygame.Surface((300, 100))
-                    surf.fill(WHITE)
-                else:
-                    surf = pygame.Surface((100, 100))
-                    surf.fill(GRAY)
                 
-                # Text auf Fallback hinzufügen
+                full_path = os.path.join(base_path, fname)
+                
+                # GIFs oder echte Bilder
+                if fname.lower().endswith('.gif'):
+                    # Einfacher Platzhalter für GIF
+                    surf = pygame.Surface((180, 180), pygame.SRCALPHA)
+                    surf.fill(GRAY)
+                    text = self.font.render(key.replace('_', ' ').title(), True, BLACK)
+                    rect = text.get_rect(center=surf.get_rect().center)
+                    surf.blit(text, rect)
+                    self.images[key] = surf
+                else:
+                    img = pygame.image.load(full_path)
+                    self.images[key] = img.convert_alpha() if img.get_alpha() else img.convert()
+            except Exception as e:
+                # Fallback-Bild generieren
+                if 'heart' in key:
+                    size = (50, 50)
+                    color = RED if 'full' in key else GRAY
+                elif 'hand' in key:
+                    size = (180, 180)
+                    color = GRAY
+                elif 'countdown' in key:
+                    size = (120, 120)
+                    color = WHITE
+                elif 'wins' in key:
+                    size = (400, 150)
+                    color = WHITE
+                else:
+                    size = (100, 100)
+                    color = GRAY
+
+                surf = pygame.Surface(size)
+                surf.fill(color)
                 text = self.small_font.render(key.replace('_', ' ').title(), True, BLACK)
-                text_rect = text.get_rect(center=surf.get_rect().center)
-                surf.blit(text, text_rect)
+                rect = text.get_rect(center=surf.get_rect().center)
+                surf.blit(text, rect)
                 self.images[key] = surf
-                print(f"Using fallback for {key}: {e}")
+
+                print(f"Using fallback for '{key}' ({fname}): {e}")
 
     def load_sounds(self):
         """Load background music with error handling"""
@@ -382,8 +378,8 @@ class PlayerVPlayerScreen:
                 pygame.mixer.music.stop()
             except:
                 pass
-            # Zurück zum Hauptmenü
-            self.manager.switch_screen(ScreenNames.MAIN_MENU)
+            # BUG FIX: Verwende change_screen statt switch_screen
+            self.manager.change_screen(ScreenNames.MAIN_MENU)
 
     # ——— DRAWING METHODS —————————————————————————————————
 
@@ -402,7 +398,7 @@ class PlayerVPlayerScreen:
             scaled_heart = pygame.transform.scale(heart_img, (heart_size, heart_size))
             self.screen.blit(scaled_heart, (x, start_y))
             
-        # Player 2 hearts (right side)
+        # Player 2 hearts (right side)  
         start_x = SCREEN_WIDTH - 50 - 3 * heart_spacing
         
         for i in range(3):
@@ -462,9 +458,13 @@ class PlayerVPlayerScreen:
 
     def draw_buttons(self):
         """Draw control buttons at bottom"""
+        # BUG FIX: Nur während der Input-Phase oder Waiting-Phase anzeigen
+        if self.game_state not in ["input_phase", "waiting_start"]:
+            return
+            
         button_width = 90
-        button_height = 90
-        button_y = SCREEN_HEIGHT - 70
+        button_height = 60  # BUG FIX: Reduzierte Höhe um Überlappung zu vermeiden
+        button_y = SCREEN_HEIGHT - 80  # BUG FIX: Höher positioniert
         
         # Player 1 buttons
         p1_buttons = [(120, "A\nRock"), (220, "S\nScissors"), (320, "D\nPaper")]
@@ -475,11 +475,11 @@ class PlayerVPlayerScreen:
             pygame.draw.rect(self.screen, GRAY, button_rect)
             pygame.draw.rect(self.screen, WHITE, button_rect, 3)
             
-            # Draw label
+            # BUG FIX: Bessere Textpositionierung
             lines = label.split('\n')
             for i, line in enumerate(lines):
                 text = self.small_font.render(line, True, WHITE)
-                text_rect = text.get_rect(center=(x, button_y - 15 + i * 25))
+                text_rect = text.get_rect(center=(x, button_y - 10 + i * 20))
                 self.screen.blit(text, text_rect)
                 
         # Player 2 buttons  
@@ -491,11 +491,11 @@ class PlayerVPlayerScreen:
             pygame.draw.rect(self.screen, GRAY, button_rect)
             pygame.draw.rect(self.screen, WHITE, button_rect, 3)
             
-            # Draw label
+            # BUG FIX: Bessere Textpositionierung
             lines = label.split('\n')
             for i, line in enumerate(lines):
                 text = self.small_font.render(line, True, WHITE)
-                text_rect = text.get_rect(center=(x, button_y - 15 + i * 25))
+                text_rect = text.get_rect(center=(x, button_y - 10 + i * 20))
                 self.screen.blit(text, text_rect)
 
     def draw_game_over(self):

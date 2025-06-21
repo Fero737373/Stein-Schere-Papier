@@ -27,6 +27,81 @@ WHITE = (255, 255, 255)
 GRAY  = (128, 128, 128)
 RED = (255, 0, 0)
 
+class GifAnimation:
+    """Simple GIF animation handler for Pygame"""
+    def __init__(self, gif_path):
+        self.frames = []
+        self.current_frame = 0
+        self.last_update = 0
+        self.frame_duration = 100  # milliseconds per frame
+        
+        try:
+            # Try to load GIF frames using PIL/Pillow if available
+            from PIL import Image
+            
+            gif = Image.open(gif_path)
+            
+            # Start from the first frame
+            gif.seek(0)
+            
+            # Extract all frames
+            frame_index = 0
+            while True:
+                try:
+                    # Ensure we're at the correct frame
+                    gif.seek(frame_index)
+                    
+                    # Convert PIL image to Pygame surface
+                    frame = gif.convert("RGBA")
+                    mode = frame.mode
+                    size = frame.size
+                    data = frame.tobytes()
+                    
+                    py_frame = pygame.image.fromstring(data, size, mode)
+                    self.frames.append(py_frame)
+                    
+                    # Try to get frame duration
+                    if 'duration' in gif.info:
+                        self.frame_duration = gif.info['duration']
+                    
+                    frame_index += 1
+                except EOFError:
+                    break
+                    
+            print(f"✅ GIF loaded with {len(self.frames)} frames")
+                    
+        except ImportError:
+            # If PIL not available, load as static image
+            print("PIL/Pillow not found - loading GIF as static image")
+            static_frame = pygame.image.load(gif_path)
+            self.frames = [static_frame]
+        except Exception as e:
+            print(f"Error loading GIF {gif_path}: {e}")
+            # Create a fallback frame
+            fallback = pygame.Surface((200, 200))
+            fallback.fill(WHITE)
+            text = pygame.font.Font(None, 24).render("GIF", True, BLACK)
+            fallback.blit(text, text.get_rect(center=fallback.get_rect().center))
+            self.frames = [fallback]
+    
+    def update(self, current_time):
+        """Update animation frame based on time"""
+        if len(self.frames) > 1:
+            if current_time - self.last_update > self.frame_duration:
+                self.current_frame = (self.current_frame + 1) % len(self.frames)
+                self.last_update = current_time
+    
+    def get_current_frame(self):
+        """Get the current frame"""
+        if self.frames:
+            return self.frames[self.current_frame]
+        return pygame.Surface((200, 200))  # Fallback
+    
+    def reset(self):
+        """Reset animation to first frame"""
+        self.current_frame = 0
+        self.last_update = pygame.time.get_ticks()
+
 class PlayerVPlayerScreen:
     def __init__(self, screen, manager):
         self.screen = screen
@@ -50,7 +125,6 @@ class PlayerVPlayerScreen:
         """Reset all game variables"""
         # Game-State
         self.game_state = "waiting_start"   # waiting_start, countdown, input_phase, show_result, game_over
-        self.countdown_stage = 0
         self.countdown_timer = 0
         self.input_timer = 0
         self.result_timer = 0
@@ -72,6 +146,8 @@ class PlayerVPlayerScreen:
 
     def load_images(self):
         """Load all game images with proper error handling"""
+        print("\n=== ASSET LOADING START ===")
+        
         # Bessere Pfad-Behandlung - erweitert um mehr mögliche Pfade
         possible_paths = [
             os.path.join(os.path.dirname(__file__), '..', 'assets'),
@@ -79,38 +155,51 @@ class PlayerVPlayerScreen:
             os.path.join(os.path.dirname(__file__), 'assets'),
             'assets',
             'src/assets',
-            os.path.join(os.getcwd(), 'assets'),  # Aktuelles Arbeitsverzeichnis
+            os.path.join(os.getcwd(), 'assets'),
             os.path.join(os.getcwd(), 'src', 'assets')
         ]
         
+        print(f"Aktuelles Arbeitsverzeichnis: {os.getcwd()}")
+        print(f"Script-Verzeichnis: {os.path.dirname(__file__)}")
+        print(f"Suche in folgenden Pfaden: {possible_paths}")
+        
         base_path = None
         for path in possible_paths:
-            if os.path.exists(path):
-                base_path = os.path.abspath(path)
-                print(f"Assets-Ordner gefunden: {base_path}")
-                # Überprüfe ob die wichtigsten Dateien existieren
-                test_files = ['SSP_battlebackground.png', 'heart_full.png']
-                files_found = 0
-                for test_file in test_files:
-                    if os.path.exists(os.path.join(path, test_file)):
-                        files_found += 1
-                if files_found > 0:
-                    print(f"Gefundene Asset-Dateien in {path}: {files_found}/{len(test_files)}")
-                    break
+            abs_path = os.path.abspath(path)
+            print(f"Prüfe Pfad: {abs_path}")
+            if os.path.exists(abs_path):
+                base_path = abs_path
+                print(f"✅ Assets-Ordner gefunden: {base_path}")
+                # Liste alle Dateien im Assets-Ordner auf
+                try:
+                    all_files = os.listdir(base_path)
+                    print(f"Alle Dateien im Assets-Ordner: {all_files}")
+                    
+                    # Suche nach dem Hintergrund mit verschiedenen möglichen Namen
+                    background_found = False
+                    for file in all_files:
+                        if 'background' in file.lower() and file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                            print(f"Möglicher Hintergrund gefunden: {file}")
+                            background_found = True
+                            
+                except Exception as e:
+                    print(f"Fehler beim Listen der Dateien: {e}")
+                break
+            else:
+                print(f"❌ Pfad existiert nicht: {abs_path}")
         
         if base_path is None:
-            print("Warning: Assets folder not found in:", possible_paths)
+            print("❌ KRITISCHER FEHLER: Kein Assets-Ordner gefunden!")
             base_path = ""
 
         self.images = {}
+        self.animations = {}  # Für GIF-Animationen
+        
         files = {
-            'background': 'SSP_battlebackground.png',   # Korrigierter Dateiname
-            'heart_full':    'heart_full.png',
-            'heart_empty':   'heart_empty.png',
-            'countdown_1':   'countdown_1.png',
-            'countdown_2':   'countdown_2.png',
-            'countdown_3':   'countdown_3.png',
-            'countdown_go':  'countdown_go.png',
+            'background': 'SSP_battlebackground.png',   # Original name
+            'heart_p1_full':    'FullHP_P1.png',
+            'heart_p2_full':    'FullHP_P2.png',  
+            'heart_empty':      'HP_Leer.png',
             'hand_p1_idle':  'hand_p1_idle.gif',
             'hand_p1_rock':  'hand_p1_rock.png',
             'hand_p1_scissors':'hand_p1_scissors.png',
@@ -124,83 +213,169 @@ class PlayerVPlayerScreen:
             'player2_wins':  'player2_wins.png'
         }
         
-        for key, fname in files.items():
+        # Spezielle Behandlung für GIFs
+        gif_files = {
+            'countdown_gif': 'countdown_gif.gif',
+            'hand_p1_idle': 'hand_p1_idle.gif',
+            'hand_p2_idle': 'hand_p2_idle.gif'
+        }
+        
+        # Lade GIFs als Animationen
+        for key, fname in gif_files.items():
+            print(f"\n--- Lade GIF Animation {key} ({fname}) ---")
             try:
                 if not base_path:
                     raise FileNotFoundError("No assets path found")
                 
                 full_path = os.path.join(base_path, fname)
                 
-                # Debug: Zeige den vollständigen Pfad
-                print(f"Versuche zu laden: {full_path}")
+                # Suche case-insensitive nach der Datei
+                if not os.path.exists(full_path) and base_path:
+                    for file in os.listdir(base_path):
+                        if file.lower() == fname.lower():
+                            full_path = os.path.join(base_path, file)
+                            break
                 
-                # Überprüfe ob Datei existiert
-                if not os.path.exists(full_path):
-                    print(f"Datei nicht gefunden: {full_path}")
-                    # Versuche alternative Dateinamen (case-insensitive)
-                    if os.path.exists(base_path):
-                        available_files = os.listdir(base_path)
-                        print(f"Verfügbare Dateien in {base_path}: {available_files}")
-                        # Suche nach ähnlichen Dateinamen
-                        for available_file in available_files:
-                            if available_file.lower() == fname.lower():
-                                full_path = os.path.join(base_path, available_file)
-                                print(f"Alternative Datei gefunden: {full_path}")
-                                break
-                    
-                # GIFs oder echte Bilder
-                if fname.lower().endswith('.gif'):
-                    # Einfacher Platzhalter für GIF
-                    surf = pygame.Surface((180, 180), pygame.SRCALPHA)
-                    surf.fill(GRAY)
-                    text = self.font.render(key.replace('_', ' ').title(), True, BLACK)
-                    rect = text.get_rect(center=surf.get_rect().center)
-                    surf.blit(text, rect)
-                    self.images[key] = surf
-                    print(f"GIF Platzhalter erstellt für: {key}")
+                if os.path.exists(full_path):
+                    self.animations[key] = GifAnimation(full_path)
+                    print(f"✅ GIF Animation geladen: {key}")
                 else:
-                    img = pygame.image.load(full_path)
-                    self.images[key] = img.convert_alpha() if img.get_alpha() else img.convert()
-                    print(f"Erfolgreich geladen: {key} ({fname})")
+                    raise FileNotFoundError(f"GIF nicht gefunden: {full_path}")
                     
             except Exception as e:
-                # Fallback-Bild generieren
-                if 'heart' in key:
+                print(f"❌ Fehler beim Laden der GIF Animation {key}: {e}")
+                # Erstelle Fallback Animation
+                fallback = pygame.Surface((200, 200))
+                fallback.fill(WHITE)
+                text = self.small_font.render(key.replace('_', ' ').title(), True, BLACK)
+                fallback.blit(text, text.get_rect(center=fallback.get_rect().center))
+                self.animations[key] = type('obj', (object,), {
+                    'frames': [fallback],
+                    'current_frame': 0,
+                    'update': lambda self, t: None,
+                    'get_current_frame': lambda self: fallback,
+                    'reset': lambda self: None
+                })()
+        
+        # Lade normale Bilder
+        for key, fname in files.items():
+            if key in gif_files:
+                continue  # Skip GIFs, already loaded as animations
+                
+            print(f"\n--- Lade {key} ({fname}) ---")
+            try:
+                if not base_path:
+                    raise FileNotFoundError("No assets path found")
+                
+                full_path = os.path.join(base_path, fname)
+                print(f"Vollständiger Pfad: {full_path}")
+                
+                # Normale case-insensitive Suche für alle Dateien
+                if not os.path.exists(full_path) and base_path and os.path.exists(base_path):
+                    for file in os.listdir(base_path):
+                        if file.lower() == fname.lower():
+                            full_path = os.path.join(base_path, file)
+                            print(f"✅ Datei gefunden (case-insensitive): {file}")
+                            break
+                
+                if os.path.exists(full_path):
+                    print(f"✅ Lade Datei: {full_path}")
+                    img = pygame.image.load(full_path)
+                    self.images[key] = img.convert_alpha() if img.get_alpha() else img.convert()
+                    print(f"✅ Erfolgreich geladen: {key} - Größe: {img.get_size()}")
+                    if key == 'background':
+                        print(f"🎯 HINTERGRUND GELADEN AUS: {os.path.basename(full_path)}")
+                else:
+                    raise FileNotFoundError(f"Datei nicht gefunden: {full_path}")
+                    
+            except Exception as e:
+                print(f"❌ Fehler beim Laden von {key}: {e}")
+                print(f"Erstelle Fallback für {key}")
+                
+                # Verbesserte Fallback-Bilder
+                if key == 'background':
+                    # Erstelle einen schöneren Fallback-Hintergrund
+                    surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+                    # Gradient-Effekt von dunkelgrün zu hellgrün
+                    for y in range(SCREEN_HEIGHT):
+                        color_val = int(40 + (y / SCREEN_HEIGHT) * 60)
+                        pygame.draw.line(surf, (color_val, color_val + 40, color_val), 
+                                       (0, y), (SCREEN_WIDTH, y))
+                    # Füge einen Titel hinzu
+                    title_text = self.font.render("ROCK PAPER SCISSORS", True, WHITE)
+                    title_rect = title_text.get_rect(center=(SCREEN_WIDTH//2, 50))
+                    surf.blit(title_text, title_rect)
+                elif 'heart_p1' in key:
                     size = (50, 50)
-                    color = RED if 'full' in key else GRAY
+                    surf = pygame.Surface(size, pygame.SRCALPHA)
+                    # Zeichne ein Herz-Symbol
+                    pygame.draw.circle(surf, (255, 100, 100), (15, 20), 12)
+                    pygame.draw.circle(surf, (255, 100, 100), (35, 20), 12)
+                    pygame.draw.polygon(surf, (255, 100, 100), [(5, 25), (25, 45), (45, 25)])
+                elif 'heart_p2' in key:
+                    size = (50, 50)
+                    surf = pygame.Surface(size, pygame.SRCALPHA)
+                    # Zeichne ein Herz-Symbol
+                    pygame.draw.circle(surf, (100, 100, 255), (15, 20), 12)
+                    pygame.draw.circle(surf, (100, 100, 255), (35, 20), 12)
+                    pygame.draw.polygon(surf, (100, 100, 255), [(5, 25), (25, 45), (45, 25)])
+                elif 'heart_empty' in key:
+                    size = (50, 50)
+                    surf = pygame.Surface(size, pygame.SRCALPHA)
+                    # Zeichne ein leeres Herz-Symbol
+                    pygame.draw.circle(surf, GRAY, (15, 20), 12, 2)
+                    pygame.draw.circle(surf, GRAY, (35, 20), 12, 2)
+                    pygame.draw.lines(surf, GRAY, False, [(5, 25), (25, 45), (45, 25)], 2)
                 elif 'hand' in key:
                     size = (180, 180)
-                    color = GRAY
-                elif 'countdown' in key:
-                    size = (120, 120)
-                    color = WHITE
+                    color = (200, 200, 200) if 'p1' in key else (150, 150, 200)
+                    surf = pygame.Surface(size)
+                    surf.fill(color)
+                    # Zeichne ein Hand-Symbol je nach Typ
+                    if 'rock' in key:
+                        pygame.draw.circle(surf, WHITE, (90, 90), 60)
+                        pygame.draw.circle(surf, color, (90, 90), 50)
+                    elif 'scissors' in key:
+                        pygame.draw.line(surf, WHITE, (60, 60), (120, 120), 10)
+                        pygame.draw.line(surf, WHITE, (120, 60), (60, 120), 10)
+                    elif 'paper' in key:
+                        pygame.draw.rect(surf, WHITE, (45, 45, 90, 90))
+                        pygame.draw.rect(surf, color, (55, 55, 70, 70))
+                    
+                    text_content = key.split('_')[-1].upper()
+                    text = self.small_font.render(text_content, True, BLACK)
+                    text_rect = text.get_rect(center=(90, 150))
+                    surf.blit(text, text_rect)
                 elif 'wins' in key:
                     size = (400, 150)
-                    color = WHITE
-                elif 'background' in key:
-                    size = (SCREEN_WIDTH, SCREEN_HEIGHT)
-                    color = (64, 128, 64)  # Grüner Hintergrund als Fallback
+                    color = (200, 200, 255) if 'player1' in key else (255, 200, 200)
+                    surf = pygame.Surface(size)
+                    surf.fill(color)
+                    text_content = "PLAYER 1 WINS!" if 'player1' in key else "PLAYER 2 WINS!"
+                    text = self.font.render(text_content, True, BLACK)
+                    text_rect = text.get_rect(center=surf.get_rect().center)
+                    surf.blit(text, text_rect)
                 else:
                     size = (100, 100)
                     color = GRAY
-
-                surf = pygame.Surface(size)
-                surf.fill(color)
+                    surf = pygame.Surface(size)
+                    surf.fill(color)
+                    text_content = key.replace('_', ' ').title()
+                    text = self.small_font.render(text_content, True, WHITE)
+                    rect = text.get_rect(center=surf.get_rect().center)
+                    surf.blit(text, rect)
                 
-                # Bessere Fallback-Texte
-                if 'background' in key:
-                    text = self.font.render("BACKGROUND", True, WHITE)
-                else:
-                    text = self.small_font.render(key.replace('_', ' ').title(), True, BLACK if color != BLACK else WHITE)
-                
-                rect = text.get_rect(center=surf.get_rect().center)
-                surf.blit(text, rect)
                 self.images[key] = surf
-
-                print(f"Using fallback for '{key}' ({fname}): {e}")
+                print(f"✅ Fallback erstellt für {key}")
                 
-        print(f"Insgesamt {len(self.images)} Bilder geladen (inkl. Fallbacks)")
-    
+        # Zeige alle geladenen Assets für Debug
+        print("\n=== GELADENE ASSETS DEBUG ===")
+        for key, img in self.images.items():
+            print(f"Image - {key}: {type(img)} - Größe: {img.get_size()}")
+        for key, anim in self.animations.items():
+            print(f"Animation - {key}: {len(anim.frames)} frames")
+        print("=== ASSET LOADING ENDE ===\n")
+
     def load_sounds(self):
         """Load background music with error handling"""
         try:
@@ -210,7 +385,9 @@ class PlayerVPlayerScreen:
                 'assets/background_battle_music.mp3',
                 'src/assets/background_battle_music.mp3',
                 'background_music.mp3',
-                'assets/background_music.mp3'
+                'assets/background_music.mp3',
+                'battle_music.mp3',
+                'assets/battle_music.mp3'
             ]
             
             music_loaded = False
@@ -221,16 +398,16 @@ class PlayerVPlayerScreen:
                         pygame.mixer.music.set_volume(0.5)
                         pygame.mixer.music.play(-1)
                         music_loaded = True
-                        print(f"Loaded music: {music_file}")
+                        print(f"✅ Musik geladen: {music_file}")
                         break
                 except pygame.error:
                     continue
                     
             if not music_loaded:
-                print("Warning: No background music found")
+                print("⚠️ Warnung: Keine Hintergrundmusik gefunden")
                 
         except Exception as e:
-            print(f"Error loading music: {e}")
+            print(f"❌ Fehler beim Laden der Musik: {e}")
 
     def handle_event(self, event):
         """Handle pygame events"""
@@ -267,6 +444,12 @@ class PlayerVPlayerScreen:
     def update(self, dt):
         """Update game logic"""
         try:
+            current_time = pygame.time.get_ticks()
+            
+            # Update GIF animations
+            for anim in self.animations.values():
+                anim.update(current_time)
+            
             # State-Updates
             if self.game_state == "countdown":
                 self.update_countdown()
@@ -329,18 +512,19 @@ class PlayerVPlayerScreen:
     def start_countdown(self):
         """Start countdown sequence"""
         self.game_state = "countdown"
-        self.countdown_stage = 0
         self.countdown_timer = pygame.time.get_ticks()
+        # Reset countdown animation to first frame
+        if 'countdown_gif' in self.animations:
+            self.animations['countdown_gif'].reset()
+            # Ensure the animation starts updating from now
+            self.animations['countdown_gif'].last_update = pygame.time.get_ticks()
         print("Starting countdown...")
 
     def update_countdown(self):
-        """Update countdown timer"""
+        """Update countdown timer - now 4 seconds total"""
         now = pygame.time.get_ticks()
-        if now - self.countdown_timer > 1000:  # 1 second per stage
-            self.countdown_stage += 1
-            self.countdown_timer = now
-            if self.countdown_stage > 3:  # After GO!
-                self.start_input_phase()
+        if now - self.countdown_timer > 4000:  # 4 Sekunden für Countdown
+            self.start_input_phase()
 
     def start_input_phase(self):
         """Start input phase"""
@@ -351,8 +535,8 @@ class PlayerVPlayerScreen:
         print("Input phase started")
 
     def update_input_phase(self):
-        """Update input phase and check timeout"""
-        if pygame.time.get_ticks() - self.input_timer > 2000:  # 2 seconds
+        """Update input phase and check timeout - now only 1 second"""
+        if pygame.time.get_ticks() - self.input_timer > 1000:  # Nur 1 Sekunde Eingabezeit
             self.resolve_round()
 
     def resolve_round(self):
@@ -420,13 +604,12 @@ class PlayerVPlayerScreen:
                 pygame.mixer.music.stop()
             except:
                 pass
-            # BUG FIX: Verwende change_screen statt switch_screen
             self.manager.change_screen(ScreenNames.MAIN_MENU)
 
     # ——— DRAWING METHODS —————————————————————————————————
 
     def draw_hearts(self):
-        """Draw player hearts with shake effect"""
+        """Draw player hearts with shake effect using new HP images"""
         heart_size = 50
         heart_spacing = 60
         
@@ -436,16 +619,26 @@ class PlayerVPlayerScreen:
         
         for i in range(3):
             x = start_x + i * heart_spacing
-            heart_img = self.images['heart_full'] if i < self.player1_lives else self.images['heart_empty']
+            if i < self.player1_lives:
+                heart_key = 'heart_p1_full'
+            else:
+                heart_key = 'heart_empty'
+                
+            heart_img = self.images[heart_key]
             scaled_heart = pygame.transform.scale(heart_img, (heart_size, heart_size))
             self.screen.blit(scaled_heart, (x, start_y))
             
-        # Player 2 hearts (right side)  
+        # Player 2 hearts (right side)
         start_x = SCREEN_WIDTH - 50 - 3 * heart_spacing
         
         for i in range(3):
             x = start_x + i * heart_spacing
-            heart_img = self.images['heart_full'] if i < self.player2_lives else self.images['heart_empty']
+            if i < self.player2_lives:
+                heart_key = 'heart_p2_full'
+            else:
+                heart_key = 'heart_empty'
+                
+            heart_img = self.images[heart_key]
             scaled_heart = pygame.transform.scale(heart_img, (heart_size, heart_size))
             self.screen.blit(scaled_heart, (x, start_y))
 
@@ -455,32 +648,48 @@ class PlayerVPlayerScreen:
         center_y = 120
         
         if self.game_state == "countdown":
-            countdown_images = ['countdown_1', 'countdown_2', 'countdown_3', 'countdown_go']
-            if self.countdown_stage < len(countdown_images):
-                img = self.images[countdown_images[self.countdown_stage]]
-                scaled_img = pygame.transform.scale(img, (120, 120))
-                img_rect = scaled_img.get_rect(center=(center_x, center_y))
-                self.screen.blit(scaled_img, img_rect)
+            # Zeige animiertes Countdown GIF
+            if 'countdown_gif' in self.animations:
+                current_frame = self.animations['countdown_gif'].get_current_frame()
+                scaled_frame = pygame.transform.scale(current_frame, (200, 200))
+                frame_rect = scaled_frame.get_rect(center=(center_x, center_y))
+                self.screen.blit(scaled_frame, frame_rect)
+            else:
+                # Fallback: Zeige Countdown-Text
+                elapsed = pygame.time.get_ticks() - self.countdown_timer
+                countdown_num = 4 - (elapsed // 1000)  # 4, 3, 2, 1
+                if countdown_num > 0:
+                    text = self.font.render(str(countdown_num), True, WHITE)
+                else:
+                    text = self.font.render("GO!", True, WHITE)
+                text_rect = text.get_rect(center=(center_x, center_y))
+                self.screen.blit(text, text_rect)
+                
         elif self.game_state == "waiting_start":
             text = self.font.render("Press SPACE to Start", True, WHITE)
             text_rect = text.get_rect(center=(center_x, center_y))
             self.screen.blit(text, text_rect)
         elif self.game_state == "input_phase":
-            remaining_time = max(0, 2000 - (pygame.time.get_ticks() - self.input_timer))
-            time_text = f"Time: {remaining_time // 1000 + 1}"
+            # Zeige verbleibende Zeit
+            remaining_time = max(0, 1000 - (pygame.time.get_ticks() - self.input_timer))
+            time_text = f"Time: {(remaining_time // 100) / 10:.1f}s"
             text = self.font.render(time_text, True, WHITE)
             text_rect = text.get_rect(center=(center_x, center_y))
             self.screen.blit(text, text_rect)
 
     def draw_hands(self):
-        """Draw player hands"""
+        """Draw player hands with GIF animations for idle state"""
         # Player 1 hand (left side)
         p1_hand_center = (200, 300)
         
         if self.game_state in ["show_result"] and self.player1_choice:
             hand_img = self.images[f'hand_p1_{self.player1_choice}']
         else:
-            hand_img = self.images['hand_p1_idle']
+            # Zeige animierte Idle-Hand
+            if 'hand_p1_idle' in self.animations:
+                hand_img = self.animations['hand_p1_idle'].get_current_frame()
+            else:
+                hand_img = self.images.get('hand_p1_idle', pygame.Surface((180, 180)))
             
         scaled_hand = pygame.transform.scale(hand_img, (180, 180))
         hand_rect = scaled_hand.get_rect(center=p1_hand_center)
@@ -492,7 +701,11 @@ class PlayerVPlayerScreen:
         if self.game_state in ["show_result"] and self.player2_choice:
             hand_img = self.images[f'hand_p2_{self.player2_choice}']
         else:
-            hand_img = self.images['hand_p2_idle']
+            # Zeige animierte Idle-Hand
+            if 'hand_p2_idle' in self.animations:
+                hand_img = self.animations['hand_p2_idle'].get_current_frame()
+            else:
+                hand_img = self.images.get('hand_p2_idle', pygame.Surface((180, 180)))
             
         scaled_hand = pygame.transform.scale(hand_img, (180, 180))
         hand_rect = scaled_hand.get_rect(center=p2_hand_center)
@@ -500,13 +713,13 @@ class PlayerVPlayerScreen:
 
     def draw_buttons(self):
         """Draw control buttons at bottom"""
-        # BUG FIX: Nur während der Input-Phase oder Waiting-Phase anzeigen
+        # Nur während der Input-Phase oder Waiting-Phase anzeigen
         if self.game_state not in ["input_phase", "waiting_start"]:
             return
             
         button_width = 90
-        button_height = 60  # BUG FIX: Reduzierte Höhe um Überlappung zu vermeiden
-        button_y = SCREEN_HEIGHT - 80  # BUG FIX: Höher positioniert
+        button_height = 60
+        button_y = SCREEN_HEIGHT - 80
         
         # Player 1 buttons
         p1_buttons = [(120, "A\nRock"), (220, "S\nScissors"), (320, "D\nPaper")]
@@ -517,7 +730,7 @@ class PlayerVPlayerScreen:
             pygame.draw.rect(self.screen, GRAY, button_rect)
             pygame.draw.rect(self.screen, WHITE, button_rect, 3)
             
-            # BUG FIX: Bessere Textpositionierung
+            # Bessere Textpositionierung
             lines = label.split('\n')
             for i, line in enumerate(lines):
                 text = self.small_font.render(line, True, WHITE)
@@ -533,7 +746,7 @@ class PlayerVPlayerScreen:
             pygame.draw.rect(self.screen, GRAY, button_rect)
             pygame.draw.rect(self.screen, WHITE, button_rect, 3)
             
-            # BUG FIX: Bessere Textpositionierung
+            # Bessere Textpositionierung
             lines = label.split('\n')
             for i, line in enumerate(lines):
                 text = self.small_font.render(line, True, WHITE)

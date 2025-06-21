@@ -72,12 +72,15 @@ class PlayerVPlayerScreen:
 
     def load_images(self):
         """Load all game images with proper error handling"""
-        # Bessere Pfad-Behandlung
+        # Bessere Pfad-Behandlung - erweitert um mehr mögliche Pfade
         possible_paths = [
             os.path.join(os.path.dirname(__file__), '..', 'assets'),
-            os.path.join(os.path.dirname(__file__), '..', '..', 'assets'),
+            os.path.join(os.path.dirname(__file__), '..', '..', 'assets'), 
+            os.path.join(os.path.dirname(__file__), 'assets'),
             'assets',
-            'src/assets'
+            'src/assets',
+            os.path.join(os.getcwd(), 'assets'),  # Aktuelles Arbeitsverzeichnis
+            os.path.join(os.getcwd(), 'src', 'assets')
         ]
         
         base_path = None
@@ -85,7 +88,15 @@ class PlayerVPlayerScreen:
             if os.path.exists(path):
                 base_path = os.path.abspath(path)
                 print(f"Assets-Ordner gefunden: {base_path}")
-                break
+                # Überprüfe ob die wichtigsten Dateien existieren
+                test_files = ['SSP_battlebackground.png', 'heart_full.png']
+                files_found = 0
+                for test_file in test_files:
+                    if os.path.exists(os.path.join(path, test_file)):
+                        files_found += 1
+                if files_found > 0:
+                    print(f"Gefundene Asset-Dateien in {path}: {files_found}/{len(test_files)}")
+                    break
         
         if base_path is None:
             print("Warning: Assets folder not found in:", possible_paths)
@@ -93,7 +104,7 @@ class PlayerVPlayerScreen:
 
         self.images = {}
         files = {
-            'background': 'background_2.png',   # Hintergrundbild
+            'background': 'SSP_battlebackground.png',   # Korrigierter Dateiname
             'heart_full':    'heart_full.png',
             'heart_empty':   'heart_empty.png',
             'countdown_1':   'countdown_1.png',
@@ -120,6 +131,23 @@ class PlayerVPlayerScreen:
                 
                 full_path = os.path.join(base_path, fname)
                 
+                # Debug: Zeige den vollständigen Pfad
+                print(f"Versuche zu laden: {full_path}")
+                
+                # Überprüfe ob Datei existiert
+                if not os.path.exists(full_path):
+                    print(f"Datei nicht gefunden: {full_path}")
+                    # Versuche alternative Dateinamen (case-insensitive)
+                    if os.path.exists(base_path):
+                        available_files = os.listdir(base_path)
+                        print(f"Verfügbare Dateien in {base_path}: {available_files}")
+                        # Suche nach ähnlichen Dateinamen
+                        for available_file in available_files:
+                            if available_file.lower() == fname.lower():
+                                full_path = os.path.join(base_path, available_file)
+                                print(f"Alternative Datei gefunden: {full_path}")
+                                break
+                    
                 # GIFs oder echte Bilder
                 if fname.lower().endswith('.gif'):
                     # Einfacher Platzhalter für GIF
@@ -129,9 +157,12 @@ class PlayerVPlayerScreen:
                     rect = text.get_rect(center=surf.get_rect().center)
                     surf.blit(text, rect)
                     self.images[key] = surf
+                    print(f"GIF Platzhalter erstellt für: {key}")
                 else:
                     img = pygame.image.load(full_path)
                     self.images[key] = img.convert_alpha() if img.get_alpha() else img.convert()
+                    print(f"Erfolgreich geladen: {key} ({fname})")
+                    
             except Exception as e:
                 # Fallback-Bild generieren
                 if 'heart' in key:
@@ -146,19 +177,30 @@ class PlayerVPlayerScreen:
                 elif 'wins' in key:
                     size = (400, 150)
                     color = WHITE
+                elif 'background' in key:
+                    size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+                    color = (64, 128, 64)  # Grüner Hintergrund als Fallback
                 else:
                     size = (100, 100)
                     color = GRAY
 
                 surf = pygame.Surface(size)
                 surf.fill(color)
-                text = self.small_font.render(key.replace('_', ' ').title(), True, BLACK)
+                
+                # Bessere Fallback-Texte
+                if 'background' in key:
+                    text = self.font.render("BACKGROUND", True, WHITE)
+                else:
+                    text = self.small_font.render(key.replace('_', ' ').title(), True, BLACK if color != BLACK else WHITE)
+                
                 rect = text.get_rect(center=surf.get_rect().center)
                 surf.blit(text, rect)
                 self.images[key] = surf
 
                 print(f"Using fallback for '{key}' ({fname}): {e}")
-
+                
+        print(f"Insgesamt {len(self.images)} Bilder geladen (inkl. Fallbacks)")
+    
     def load_sounds(self):
         """Load background music with error handling"""
         try:
